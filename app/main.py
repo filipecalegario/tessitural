@@ -85,9 +85,57 @@ async def upload(file: UploadFile) -> dict:
     return {"file_path": str(dest), "title": dest.stem}
 
 
+class BatchRequest(BaseModel):
+    """Uma música por linha: pode ser link do YouTube ou o nome para buscar."""
+
+    queries: list[str]
+    tag: str = "neutral"
+    separate: bool = True
+    model: str = "htdemucs"
+
+
+@app.post("/api/analyze/batch")
+def analyze_batch(req: BatchRequest) -> dict:
+    items = [q.strip() for q in req.queries if q and q.strip()]
+    if not items:
+        raise HTTPException(400, "nenhuma música informada")
+    if len(items) > 60:
+        raise HTTPException(400, "no máximo 60 músicas por vez")
+
+    created = []
+    for query in items:
+        job_id = jobs.create("analyze", query)
+        jobs.submit(
+            job_id,
+            pipeline.run,
+            job_id,
+            url=query,
+            title=None,
+            artist=None,
+            tag=req.tag,
+            do_separate=req.separate,
+            model=req.model,
+        )
+        created.append({"job_id": job_id, "label": query})
+    return {"jobs": created, "queued": len(created)}
+
+
 @app.get("/api/jobs")
-def list_jobs() -> dict:
-    return {"jobs": jobs.active()}
+def list_jobs(active_only: bool = False) -> dict:
+    return {"jobs": jobs.active() if active_only else jobs.listing()}
+
+
+@app.delete("/api/jobs/{job_id}")
+def cancel_job(job_id: str) -> dict:
+    outcome = jobs.request_cancel(job_id)
+    if outcome == "unknown":
+        raise HTTPException(404, "job não encontrado")
+    return {"id": job_id, "outcome": outcome}
+
+
+@app.post("/api/jobs/clear")
+def clear_jobs() -> dict:
+    return {"removed": jobs.clear_finished()}
 
 
 @app.get("/api/jobs/{job_id}")

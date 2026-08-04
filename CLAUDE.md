@@ -55,7 +55,11 @@ Se mudar a forma do `analysis.json`, reanalise a biblioteca inteira — não há
   manchete. Os brutos ficam em `abs_min_note`/`abs_max_note`.
 - **Demucs no MPS pode falhar** dependendo da versão do torch; `separate.py` já cai para CPU
   sozinho. Não remova o fallback.
-- **A fila tem 1 worker de propósito** — dois Demucs simultâneos estouram a memória.
+- **A fila tem 1 worker de propósito** — dois Demucs simultâneos estouram a memória. O
+  cancelamento é cooperativo: `jobs.checkpoint(job_id)` levanta `jobs.Cancelled` entre as
+  etapas caras do `pipeline.run`. Se acrescentar uma etapa longa, ponha um checkpoint antes.
+- **O polling é um só para a fila inteira** (`pollQueue` em `app.js`), não um por job — com
+  20 músicas enfileiradas, vinte timers seriam vinte requisições por segundo.
 - **`compute_stats` pondera por duração**, não por contagem de notas. Percentil de altura
   aqui significa "onde a voz passa X% do *tempo*", que é o que importa para esforço vocal.
 

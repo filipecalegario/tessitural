@@ -383,6 +383,7 @@ input[type="text"], input[type="url"], input[type="number"], select, textarea {
   font-size: 14px;
 }
 input[type="file"] { color: var(--silk-2); font-size: 13px; }
+textarea { resize: vertical; min-height: 92px; line-height: 1.6; font-family: var(--mono); font-size: 13px; }
 input::placeholder { color: var(--silk-3); }
 input:focus, select:focus, textarea:focus {
   outline: 2px solid var(--lamp);
@@ -604,14 +605,46 @@ details.table-view[open] summary { margin-bottom: 14px; }
 
 /* ══════════════════════════ Trabalho em andamento ══════════════════════════ */
 
+.queue-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--silk-3);
+}
+.queue-head button { margin-left: auto; }
+
 .job {
   border: 1px solid var(--rule);
-  border-left: 2px solid var(--lamp);
-  padding: 15px 18px;
-  margin-bottom: 12px;
+  border-left: 2px solid var(--rule-firm);
+  padding: 13px 16px;
+  margin-bottom: 8px;
   background: var(--panel);
 }
-.job-head { display: flex; align-items: center; gap: 11px; margin-bottom: 9px; }
+.job.running { border-left-color: var(--lamp); }
+.job.done { border-left-color: var(--voice); }
+.job.cancelled { opacity: 0.55; }
+.job-head { display: flex; align-items: center; gap: 11px; }
+.job-head .ghost { padding: 5px 10px; font-size: 9.5px; }
+
+/* Posição na fila, no lugar onde o spinner aparece quando começa a rodar. */
+.job-mark {
+  width: 18px; height: 18px;
+  flex: 0 0 auto;
+  display: grid; place-items: center;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--silk-3);
+  border: 1px solid var(--rule-firm);
+}
+.job-mark.done::after { content: "✓"; color: var(--voice); }
+.job-mark.error::after { content: "!"; color: var(--strain); }
+.job-mark.cancelled::after { content: "–"; }
+.job-log.err { color: var(--strain); }
 .job-title { font-size: 13.5px; font-weight: 600; }
 .job-status {
   margin-left: auto;
@@ -625,8 +658,9 @@ details.table-view[open] summary { margin-bottom: 14px; }
   font-family: var(--mono);
   font-size: 11px;
   color: var(--silk-3);
-  max-height: 148px;
+  max-height: 92px;
   overflow-y: auto;
+  margin-top: 9px;
 }
 .job-log div { padding: 1.5px 0; }
 .job-log div:last-child { color: var(--silk); }

@@ -53,6 +53,7 @@ def run(
     staging = library.DATA_DIR / "staging" / job_id
     staging.mkdir(parents=True, exist_ok=True)
 
+    jobs.checkpoint(job_id)
     if url:
         info = download.download_youtube(url, staging, log=log)
         key = url
@@ -76,6 +77,7 @@ def run(
         leftover.unlink(missing_ok=True)
     staging.rmdir()
 
+    jobs.checkpoint(job_id)
     vocal_path = mix_path
     separated = False
     if do_separate:
@@ -88,6 +90,7 @@ def run(
     else:
         log("separação desativada — analisando a mixagem completa")
 
+    jobs.checkpoint(job_id)
     result = analysis.analyze(str(vocal_path), mix_path=str(mix_path), log=log)
     result["meta"] = {
         "id": sid,

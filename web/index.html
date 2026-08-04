@@ -171,16 +171,17 @@
         </div>
 
         <label class="field" id="field-url">
-          <span>Link — ou o nome da música, que eu procuro</span>
-          <input type="text" id="in-url" placeholder="Sixteen Tons Tennessee Ernie Ford">
+          <span>Uma música por linha — link ou nome, que eu procuro</span>
+          <textarea id="in-url" rows="4" spellcheck="false"
+            placeholder="Sixteen Tons Tennessee Ernie Ford&#10;Marília Mendonça Infiel&#10;https://youtube.com/watch?v=…"></textarea>
         </label>
 
         <label class="field" id="field-file" hidden>
-          <span>Arquivo de áudio</span>
-          <input type="file" id="in-file" accept="audio/*">
+          <span>Arquivos de áudio — pode escolher vários</span>
+          <input type="file" id="in-file" accept="audio/*" multiple>
         </label>
 
-        <div class="row">
+        <div class="row" id="single-only">
           <label class="field">
             <span>Título — opcional</span>
             <input type="text" id="in-title" placeholder="o YouTube preenche sozinho">
@@ -190,6 +191,7 @@
             <input type="text" id="in-artist" placeholder="intérprete">
           </label>
         </div>
+        <p class="sub" id="batch-note" hidden style="margin:-8px 0 18px;"></p>
       </div>
     </div>
 
@@ -220,8 +222,18 @@
       </div>
     </div>
 
-    <div class="register plain" id="jobs-wrap" hidden>
-      <div id="jobs"></div>
+    <div class="register" id="jobs-wrap" hidden>
+      <div class="eyebrow">
+        Fila
+        <span class="hint">Uma de cada vez: dois Demucs ao mesmo tempo brigariam por memória. A fila vive na memória do servidor — reiniciar perde o que estiver pendente.</span>
+      </div>
+      <div class="register-body">
+        <div class="queue-head">
+          <span id="queue-summary"></span>
+          <button class="ghost" id="btn-clear-jobs" hidden>Limpar concluídas</button>
+        </div>
+        <div id="jobs"></div>
+      </div>
     </div>
   </section>
 

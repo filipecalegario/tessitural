@@ -45,8 +45,9 @@ as dependências (inclui PyTorch, ~2 GB). Variável `PORT` muda a porta.
    sem pensar, e a *extensão*, até onde você chega forçando. Não precisa acertar de
    primeira; depois de analisar algumas músicas a aba sugere valores a partir das que você
    marcou como confortáveis. A régua no topo da tela mostra esse alcance o tempo todo.
-2. **Analisar** — cole o link ou digite o nome da música. Classifique como confortável /
-   difícil / não sei. Leva alguns minutos: a separação do vocal é a parte demorada.
+2. **Analisar** — cole o link ou digite o nome da música. **Uma por linha enfileira várias**
+   de uma vez; o painel Fila mostra a posição de cada uma e deixa cancelar. Leva alguns
+   minutos por música: a separação do vocal é a parte demorada.
 3. **Música** — o veredito em uma frase, o mapa de notas e os detalhes.
 4. **Biblioteca** — todas as músicas na mesma régua. É aqui que o padrão aparece.
 
@@ -341,8 +342,11 @@ deuteranopia. Além disso, no piano roll a posição vertical já diz se a nota 
 reforça. Todo gráfico tem legenda, e os principais têm visão em tabela.
 
 **Por que uma fila com um worker só.**
-Dois Demucs simultâneos brigariam por memória. A fila serializa; o tempo de espera aparece
-no log de progresso.
+Dois Demucs simultâneos brigariam por memória. A fila serializa, e a interface mostra a
+posição de cada pendente. O cancelamento é cooperativo: quem ainda não começou sai na hora,
+quem já está rodando para na fronteira da próxima etapa — não dá para interromper o Demucs
+no meio com segurança. A fila vive em memória; reiniciar o servidor perde o que estava
+pendente, mas as análises concluídas já estão no disco.
 
 ## API
 
@@ -351,8 +355,11 @@ no log de progresso.
 | `GET` | `/api/health` | Estado do servidor e se o Demucs está disponível |
 | `POST` | `/api/analyze` | Enfileira uma análise. Corpo: `url` ou `file_path`, `title`, `artist`, `tag`, `separate` |
 | `POST` | `/api/upload` | Recebe um arquivo do navegador, devolve `file_path` |
-| `GET` | `/api/jobs` | Jobs ativos (para retomar o polling após recarregar a página) |
+| `POST` | `/api/analyze/batch` | Enfileira várias de uma vez. Corpo: `queries` (lista de links ou nomes), `tag`, `separate` |
+| `GET` | `/api/jobs` | A fila inteira, com posição de cada pendente. `?active_only=true` filtra |
 | `GET` | `/api/jobs/{id}` | Status e log de progresso |
+| `DELETE` | `/api/jobs/{id}` | Cancela. Pendente sai na hora; a que roda para na próxima etapa |
+| `POST` | `/api/jobs/clear` | Remove da lista as que já terminaram |
 | `GET` | `/api/library` | Índice enxuto de todas as músicas |
 | `GET` | `/api/songs/{id}` | Análise completa (notas, contorno, estatísticas) |
 | `PATCH` | `/api/songs/{id}` | Atualiza `tag`, `note`, `title`, `artist` |

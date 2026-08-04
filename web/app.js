@@ -487,80 +487,202 @@ document.querySelectorAll("#in-separate button").forEach(b => {
   });
 });
 
+/* O campo aceita várias linhas. Uma linha = uma música; título e artista só
+   fazem sentido quando é uma só, então somem quando vira lista. */
+function queryLines() {
+  return document.getElementById("in-url").value
+    .split("\n").map(l => l.trim()).filter(Boolean);
+}
+
+function syncBatchUI() {
+  const n = sourceMode === "upload"
+    ? (document.getElementById("in-file").files || []).length
+    : queryLines().length;
+  const batch = n > 1;
+  document.getElementById("single-only").hidden = batch || sourceMode === "upload";
+  const note = document.getElementById("batch-note");
+  note.hidden = !batch;
+  if (batch) note.textContent = `${n} músicas na fila — os títulos vêm da fonte.`;
+  document.getElementById("btn-analyze").textContent = batch ? `Analisar ${n}` : "Analisar";
+}
+
+document.getElementById("in-url").addEventListener("input", syncBatchUI);
+document.getElementById("in-file").addEventListener("change", syncBatchUI);
+
 document.getElementById("btn-analyze").addEventListener("click", async () => {
   const btn = document.getElementById("btn-analyze");
   btn.disabled = true;
   try {
-    const body = {
-      title: document.getElementById("in-title").value.trim() || null,
-      artist: document.getElementById("in-artist").value.trim() || null,
-      tag: newTag,
-      separate: doSeparate,
-    };
     if (sourceMode === "youtube") {
-      const url = document.getElementById("in-url").value.trim();
-      if (!url) { alert("Cole o link do YouTube."); return; }
-      body.url = url;
+      const lines = queryLines();
+      if (!lines.length) { alert("Escreva ao menos uma música — link ou nome."); return; }
+
+      if (lines.length === 1) {
+        await enqueue({
+          url: lines[0],
+          title: document.getElementById("in-title").value.trim() || null,
+          artist: document.getElementById("in-artist").value.trim() || null,
+          tag: newTag, separate: doSeparate,
+        });
+      } else {
+        const { jobs: created } = await api("/analyze/batch", {
+          method: "POST",
+          body: JSON.stringify({ queries: lines, tag: newTag, separate: doSeparate }),
+        });
+        for (const j of created) {
+          state.jobs.set(j.job_id, { id: j.job_id, label: j.label, status: "queued", progress: [] });
+        }
+        renderJobs();
+        pollQueue();
+      }
+      document.getElementById("in-url").value = "";
+      document.getElementById("in-title").value = "";
+      document.getElementById("in-artist").value = "";
     } else {
-      const f = document.getElementById("in-file").files[0];
-      if (!f) { alert("Escolha um arquivo de áudio."); return; }
-      const fd = new FormData();
-      fd.append("file", f);
-      const res = await fetch("/api/upload", { method: "POST", body: fd });
-      if (!res.ok) throw new Error("falha no envio do arquivo");
-      const up = await res.json();
-      body.file_path = up.file_path;
-      if (!body.title) body.title = up.title;
+      const files = [...(document.getElementById("in-file").files || [])];
+      if (!files.length) { alert("Escolha ao menos um arquivo de áudio."); return; }
+      for (const f of files) {
+        const fd = new FormData();
+        fd.append("file", f);
+        const res = await fetch("/api/upload", { method: "POST", body: fd });
+        if (!res.ok) throw new Error(`falha ao enviar ${f.name}`);
+        const up = await res.json();
+        await enqueue({
+          file_path: up.file_path,
+          title: files.length === 1
+            ? (document.getElementById("in-title").value.trim() || up.title)
+            : up.title,
+          artist: files.length === 1 ? (document.getElementById("in-artist").value.trim() || null) : null,
+          tag: newTag, separate: doSeparate,
+        });
+      }
+      document.getElementById("in-file").value = "";
     }
-    const { job_id } = await api("/analyze", { method: "POST", body: JSON.stringify(body) });
-    state.jobs.set(job_id, { id: job_id, label: body.title || body.url, status: "queued", progress: [] });
-    document.getElementById("in-url").value = "";
-    renderJobs();
-    pollJob(job_id);
+    syncBatchUI();
   } catch (e) {
-    alert("Não consegui iniciar: " + e.message);
+    alert("Não consegui enfileirar: " + e.message);
   } finally {
     btn.disabled = false;
   }
 });
 
-async function pollJob(id) {
-  try {
-    const job = await api("/jobs/" + id);
-    state.jobs.set(id, job);
-    renderJobs();
-    if (job.status === "running" || job.status === "queued") {
-      setTimeout(() => pollJob(id), 1200);
-    } else if (job.status === "done") {
-      await loadLibrary();
-      renderLibrary();
-      if (job.result && job.result.id) {
-        setTimeout(() => { location.hash = "song/" + job.result.id; }, 400);
+async function enqueue(body) {
+  const { job_id } = await api("/analyze", { method: "POST", body: JSON.stringify(body) });
+  state.jobs.set(job_id, {
+    id: job_id, label: body.title || body.url || "análise", status: "queued", progress: [],
+  });
+  renderJobs();
+  pollQueue();
+}
+
+/* Um único polling para a fila inteira, em vez de um por job: com 20 músicas
+   enfileiradas, vinte timers seriam vinte requisições por segundo. */
+let queueTimer = null;
+async function pollQueue() {
+  if (queueTimer) return;
+  const tick = async () => {
+    let live = 0;
+    try {
+      const { jobs: all } = await api("/jobs");
+      for (const j of all) state.jobs.set(j.id, j);
+      live = all.filter(j => j.status === "queued" || j.status === "running").length;
+      const finished = all.filter(j => j.status === "done" && !j._seen);
+      for (const j of finished) {
+        j._seen = true;
+        state.jobs.set(j.id, j);
       }
+      if (finished.length) { await loadLibrary(); renderLibrary(); }
+      renderJobs();
+    } catch { live = 1; }
+    if (live > 0) {
+      queueTimer = setTimeout(tick, 1500);
+    } else {
+      queueTimer = null;
     }
-  } catch {
-    setTimeout(() => pollJob(id), 2500);
+  };
+  queueTimer = setTimeout(tick, 200);
+}
+
+async function cancelJob(id) {
+  try {
+    const r = await api("/jobs/" + id, { method: "DELETE" });
+    if (r.outcome === "stopping") {
+      const j = state.jobs.get(id);
+      if (j) j.progress = [...(j.progress || []), { message: "parando ao fim da etapa atual" }];
+    }
+    pollQueue();
+    renderJobs();
+  } catch (e) {
+    alert("Não consegui cancelar: " + e.message);
   }
 }
 
+const JOB_STATUS = {
+  queued: "na fila", running: "processando", done: "concluída",
+  error: "erro", cancelled: "cancelada",
+};
+
 function renderJobs() {
   const host = document.getElementById("jobs");
-  const jobs = [...state.jobs.values()].reverse();
-  document.getElementById("jobs-wrap").hidden = jobs.length === 0;
+  const jobs = [...state.jobs.values()].sort((a, b) => (a.created_at || 0) - (b.created_at || 0));
+  const wrap = document.getElementById("jobs-wrap");
+  wrap.hidden = jobs.length === 0;
+  if (!jobs.length) { host.innerHTML = ""; return; }
+
+  const live = jobs.filter(j => j.status === "queued" || j.status === "running");
+  const count = st => jobs.filter(j => j.status === st).length;
+
+  const summary = [
+    count("running") ? "1 processando" : null,
+    count("queued") ? `${count("queued")} esperando` : null,
+    count("done") ? `${count("done")} concluída${count("done") > 1 ? "s" : ""}` : null,
+    count("error") ? `${count("error")} com erro` : null,
+    count("cancelled") ? `${count("cancelled")} cancelada${count("cancelled") > 1 ? "s" : ""}` : null,
+  ].filter(Boolean).join(" · ") || "fila vazia";
+  document.getElementById("queue-summary").textContent = summary;
+  document.getElementById("btn-clear-jobs").hidden = jobs.length === live.length;
+
   host.innerHTML = jobs.map(j => {
-    const running = j.status === "running" || j.status === "queued";
-    const lines = (j.progress || []).slice(-8).map(p => `<div>${escapeHtml(p.message)}</div>`).join("");
-    const statusText = { queued: "na fila", running: "processando", done: "concluída", error: "erro" }[j.status] || j.status;
-    return `<div class="job${j.status === "error" ? " error" : ""}">
+    const running = j.status === "running";
+    const queued = j.status === "queued";
+    const lines = (j.progress || []).slice(-4)
+      .map(p => `<div>${escapeHtml(p.message)}</div>`).join("");
+    const marker = running
+      ? '<div class="spinner"></div>'
+      : `<span class="job-mark ${j.status}">${queued ? j.queue_position ?? "·" : ""}</span>`;
+    const body = j.status === "error"
+      ? `<div class="job-log err">${escapeHtml(j.error || "")}</div>`
+      : queued
+        ? ""
+        : `<div class="job-log">${lines}</div>`;
+    const link = j.status === "done" && j.result && j.result.id
+      ? `<button class="ghost" data-open="${j.result.id}">Abrir</button>` : "";
+    const stop = (running || queued)
+      ? `<button class="ghost" data-cancel="${j.id}">${running ? "Parar" : "Tirar da fila"}</button>` : "";
+    return `<div class="job ${j.status}">
       <div class="job-head">
-        ${running ? '<div class="spinner"></div>' : ""}
+        ${marker}
         <span class="job-title">${escapeHtml(j.label || "análise")}</span>
-        <span class="job-status">${statusText}</span>
+        <span class="job-status">${JOB_STATUS[j.status] || j.status}</span>
+        ${link}${stop}
       </div>
-      <div class="job-log">${j.status === "error" ? `<div style="color:var(--alert)">${escapeHtml(j.error || "")}</div>` : lines || "<div>iniciando…</div>"}</div>
+      ${body}
     </div>`;
   }).join("");
+
+  host.querySelectorAll("[data-cancel]").forEach(b =>
+    b.addEventListener("click", () => cancelJob(b.dataset.cancel)));
+  host.querySelectorAll("[data-open]").forEach(b =>
+    b.addEventListener("click", () => { location.hash = "song/" + b.dataset.open; }));
 }
+
+document.getElementById("btn-clear-jobs").addEventListener("click", async () => {
+  await api("/jobs/clear", { method: "POST" });
+  for (const [id, j] of [...state.jobs]) {
+    if (j.status !== "queued" && j.status !== "running") state.jobs.delete(id);
+  }
+  renderJobs();
+});
 
 /* ---------------- Meu alcance ---------------- */
 
@@ -681,12 +803,14 @@ window.addEventListener("resize", () => {
   await loadLibrary();
   drawRail();
 
-  // Retoma análises que já estavam rodando quando a página foi recarregada.
+  // Retoma a fila que já estava rodando quando a página foi recarregada.
   try {
     const { jobs } = await api("/jobs");
-    for (const j of jobs) { state.jobs.set(j.id, j); pollJob(j.id); }
-    if (jobs.length) renderJobs();
+    for (const j of jobs) state.jobs.set(j.id, j);
+    if (jobs.length) { renderJobs(); pollQueue(); }
   } catch {}
+
+  syncBatchUI();
 
   setTranspose(0);
   route();
