@@ -442,6 +442,15 @@ button.ghost.danger:hover { color: var(--strain); border-color: var(--strain); }
 .seg button:hover { color: var(--silk); }
 .seg button[aria-pressed="true"] { background: var(--lit); color: var(--silk); }
 
+/* Os botões de zoom são símbolos, não rótulos: sem tracking de caixa alta. */
+#zoom-out, #zoom-in {
+  font-family: var(--mono);
+  font-size: 14px;
+  letter-spacing: 0;
+  padding: 6px 12px;
+  line-height: 1;
+}
+
 .field-label {
   display: block;
   font-size: 9.5px;

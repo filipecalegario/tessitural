@@ -21,11 +21,13 @@ const PianoRoll = (() => {
   let drag = null;
   let reveal = 1;       // 0→1: as notas entram da esquerda, como a música tocando
   let revealRAF = null;
+  let cssHeight = 460;  // altura em pixels de CSS, fixa — ver render()
 
   function init(canvasEl, opts = {}) {
     canvas = canvasEl;
     ctx = canvas.getContext("2d");
     onSeek = opts.onSeek || null;
+    cssHeight = parseInt(canvasEl.getAttribute("height"), 10) || 460;
 
     canvas.addEventListener("mousemove", handleMove);
     canvas.addEventListener("mouseleave", () => { Tooltip.hide(); });
@@ -82,8 +84,10 @@ const PianoRoll = (() => {
   /* ---- geometria ---- */
 
   function plot() {
-    const w = canvas.clientWidth || canvas.width;
-    const h = canvas.clientHeight || canvas.height;
+    // Sempre em pixels de CSS. Ler canvas.width/height aqui traria o bitmap
+    // já multiplicado pelo dpr e desalinharia tudo.
+    const w = canvas.clientWidth || 800;
+    const h = cssHeight;
     return { x: GUTTER, y: PAD_T, w: w - GUTTER, h: h - PAD_T - AXIS_H, W: w, H: h };
   }
 
@@ -115,13 +119,18 @@ const PianoRoll = (() => {
 
   function render() {
     if (!canvas || !data) return;
+    // A altura vem de `cssHeight`, NUNCA do atributo `height` do canvas.
+    // Escrever em canvas.height reflete no atributo, então lê-lo de volta e
+    // multiplicar pelo dpr outra vez faz o bitmap dobrar a cada quadro: em tela
+    // Retina isso chegava a milhões de pixels de altura e derrubava a aba.
     const dpr = window.devicePixelRatio || 1;
     const w = canvas.clientWidth;
-    const h = parseInt(canvas.getAttribute("height"), 10) || 440;
+    const h = cssHeight;
     canvas.style.height = h + "px";
-    if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
-      canvas.width = Math.round(w * dpr);
-      canvas.height = Math.round(h * dpr);
+    const bw = Math.round(w * dpr), bh = Math.round(h * dpr);
+    if (canvas.width !== bw || canvas.height !== bh) {
+      canvas.width = bw;
+      canvas.height = bh;
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
@@ -435,23 +444,38 @@ const PianoRoll = (() => {
     render();
   }
 
-  function handleWheel(ev) {
-    ev.preventDefault();
-    const { x } = localPos(ev);
-    const p = plot();
-    if (x < p.x) return;
-    const anchor = xToTime(x);
-    const factor = Math.exp(ev.deltaY * 0.0015);
-    const dur = data.duration;
-    let span = (view.t1 - view.t0) * factor;
-    span = Math.min(dur, Math.max(1.5, span));
+  /* Aproxima em torno de um instante, mantendo-o parado sob o cursor. */
+  function applyZoom(anchor, factor) {
+    if (!data) return;
+    const dur = data.duration || 1;
     const frac = (anchor - view.t0) / (view.t1 - view.t0);
+    let span = Math.min(dur, Math.max(1.5, (view.t1 - view.t0) * factor));
     let t0 = anchor - frac * span;
     let t1 = t0 + span;
     if (t0 < 0) { t0 = 0; t1 = span; }
     if (t1 > dur) { t1 = dur; t0 = Math.max(0, dur - span); }
     view = { t0, t1 };
     render();
+  }
+
+  function zoomBy(factor) {
+    if (!data) return;
+    // Sem cursor envolvido, ancora no que estiver tocando; senão, no centro.
+    const anchor = playhead !== null && playhead >= view.t0 && playhead <= view.t1
+      ? playhead : (view.t0 + view.t1) / 2;
+    applyZoom(anchor, factor);
+  }
+
+  function handleWheel(ev) {
+    // Rolar a página é da página. O zoom fica no gesto de pinça — que o macOS
+    // entrega como wheel com ctrlKey — e nos modificadores. Sequestrar toda
+    // rolagem sobre o gráfico prendia a pessoa no meio da tela.
+    if (!ev.ctrlKey && !ev.metaKey && !ev.altKey) return;
+    ev.preventDefault();
+    const { x } = localPos(ev);
+    const p = plot();
+    if (x < p.x) return;
+    applyZoom(xToTime(x), Math.exp(ev.deltaY * 0.0015));
   }
 
   function focusOn(t, pad = 4) {
@@ -464,5 +488,6 @@ const PianoRoll = (() => {
     render();
   }
 
-  return { init, setData, setTranspose, setRange, setSettings, setPlayhead, render, resetView, getRange, focusOn };
+  return { init, setData, setTranspose, setRange, setSettings, setPlayhead, render,
+           resetView, getRange, focusOn, zoomBy };
 })();

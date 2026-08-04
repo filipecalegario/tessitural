@@ -410,6 +410,10 @@ function setTranspose(v) {
 }
 
 document.getElementById("transpose").addEventListener("input", e => setTranspose(parseInt(e.target.value, 10)));
+document.getElementById("zoom-in").addEventListener("click", () => PianoRoll.zoomBy(0.55));
+document.getElementById("zoom-out").addEventListener("click", () => PianoRoll.zoomBy(1.8));
+document.getElementById("zoom-fit").addEventListener("click", () => PianoRoll.resetView());
+
 document.getElementById("transpose-best").addEventListener("click", e => {
   setTranspose(parseInt(e.currentTarget.dataset.shift || "0", 10));
 });
@@ -419,14 +423,19 @@ const playBtn = document.getElementById("play-btn");
 playBtn.addEventListener("click", () => {
   if (player.paused) player.play(); else player.pause();
 });
-player.addEventListener("play", () => { playBtn.textContent = "❚❚ Pausar"; tick(); });
+player.addEventListener("play", () => { playBtn.textContent = "❚❚ Pausar"; startTick(); });
 player.addEventListener("pause", () => { playBtn.textContent = "▶ Tocar"; });
 player.addEventListener("ended", () => { playBtn.textContent = "▶ Tocar"; });
 
-function tick() {
-  if (player.paused) return;
-  PianoRoll.setPlayhead(player.currentTime);
-  requestAnimationFrame(tick);
+let tickRAF = null;
+function startTick() {
+  if (tickRAF) cancelAnimationFrame(tickRAF);
+  const step = () => {
+    if (player.paused) { tickRAF = null; return; }
+    PianoRoll.setPlayhead(player.currentTime);
+    tickRAF = requestAnimationFrame(step);
+  };
+  tickRAF = requestAnimationFrame(step);
 }
 
 document.querySelectorAll("#audio-src button").forEach(b => {

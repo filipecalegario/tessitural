@@ -112,6 +112,11 @@
               <input type="range" id="transpose" min="-12" max="12" step="1" value="0">
               <span class="readout-inline" id="transpose-out">0 st</span>
             </div>
+            <div class="seg" role="group" aria-label="Aproximar no tempo">
+              <button id="zoom-out" title="Afastar">−</button>
+              <button id="zoom-in" title="Aproximar">+</button>
+              <button id="zoom-fit">Tudo</button>
+            </div>
             <button class="ghost" id="transpose-best">Melhor tom</button>
             <button class="ghost" id="play-btn">▶ Tocar</button>
             <div class="seg" id="audio-src" role="group" aria-label="Fonte de áudio">
@@ -124,7 +129,7 @@
             <div><svg class="chart" id="hist-chart" height="460"></svg></div>
           </div>
           <div class="roll-hint">
-            Clique para ouvir a partir dali · <kbd>scroll</kbd> aproxima ·
+            Clique para ouvir a partir dali · pinça (ou <kbd>alt</kbd> + scroll) aproxima ·
             <kbd>shift</kbd> + arrastar percorre
           </div>
         </div>

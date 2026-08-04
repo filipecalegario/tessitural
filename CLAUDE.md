@@ -43,6 +43,22 @@ não quebra nada, só devolve números musicalmente errados. Antes de aceitar qu
 4. **Reanálise barata.** `POST /api/songs/{id}/reanalyze` refaz só o pYIN sobre os stems já
    no disco. Use isso em vez de rebaixar e reseparar (que leva minutos).
 
+## Como validar a interface
+
+Screenshot por Chrome headless funciona, mas **ele roda com `devicePixelRatio` 1** — e o
+usuário está num Mac Retina, com dpr 2. Um bug de escala de canvas passou batido justamente
+por isso. Sempre confira também com `--force-device-scale-factor=2`:
+
+```bash
+CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+"$CHROME" --headless=new --disable-gpu --force-device-scale-factor=2 \
+  --virtual-time-budget=10000 --screenshot=out.png --window-size=1450,900 \
+  "http://127.0.0.1:8420/#song/<id>"
+```
+
+`--dump-dom` no lugar de `--screenshot` mostra os atributos depois que o JS rodou — foi
+assim que o canvas inflado apareceu.
+
 Se mudar a forma do `analysis.json`, reanalise a biblioteca inteira — não há migração.
 
 ## Armadilhas conhecidas
@@ -60,6 +76,11 @@ Se mudar a forma do `analysis.json`, reanalise a biblioteca inteira — não há
   etapas caras do `pipeline.run`. Se acrescentar uma etapa longa, ponha um checkpoint antes.
 - **O polling é um só para a fila inteira** (`pollQueue` em `app.js`), não um por job — com
   20 músicas enfileiradas, vinte timers seriam vinte requisições por segundo.
+- **Nunca leia a altura do canvas de volta do atributo.** Escrever `canvas.height`
+  reflete no atributo `height`; se `render()` lê esse atributo e multiplica pelo
+  `devicePixelRatio` outra vez, o bitmap dobra a cada quadro. Em Retina isso chegou a
+  3.768.320 px de altura (~13 GB) e derrubava a aba. A altura em CSS mora em `cssHeight`,
+  capturada uma vez no `init`.
 - **`compute_stats` pondera por duração**, não por contagem de notas. Percentil de altura
   aqui significa "onde a voz passa X% do *tempo*", que é o que importa para esforço vocal.
 
