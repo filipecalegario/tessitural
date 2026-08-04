@@ -1,0 +1,25 @@
+[project]
+name = "tessitural"
+version = "0.1.0"
+description = "Análise local da tessitura vocal de músicas"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "python-multipart>=0.0.20",
+    "yt-dlp>=2025.6.9",
+    "librosa>=0.11",
+    "numpy>=2.0",
+    "scipy>=1.14",
+    "soundfile>=0.13",
+]
+
+[project.optional-dependencies]
+separation = [
+    "demucs>=4.0.1",
+    "torch>=2.6",
+    "torchaudio>=2.6",
+]
+
+[tool.uv]
+package = false
