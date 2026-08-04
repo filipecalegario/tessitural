@@ -31,10 +31,77 @@ const Charts = (() => {
         sw.style.background = "transparent";
         sw.style.border = "2px solid " + it.color;
       }
+      // Superfícies quase somem contra o painel: um contorno as torna visíveis.
+      if (it.outline) sw.style.boxShadow = "inset 0 0 0 1px var(--rule-firm)";
       span.appendChild(sw);
       span.appendChild(document.createTextNode(it.label));
       el.appendChild(span);
     }
+  }
+
+  /* =========================================================
+     Régua de registro — permanente no cabeçalho
+
+     Sua voz é desenhada como superfície (uma faixa acesa), não como cor:
+     é o chão contra o qual as músicas são medidas. A música aberta se
+     sobrepõe como tinta — azul o que alcança, coral o que estoura.
+     ========================================================= */
+
+  const RAIL_LO = 36;   // C2
+  const RAIL_HI = 84;   // C6
+
+  function registerRail(svg, settings, song) {
+    clearEl(svg);
+    const width = +svg.getAttribute("width") || 300;
+    const height = +svg.getAttribute("height") || 30;
+    const KEY_TOP = 11, KEY_H = height - KEY_TOP - 1;
+
+    const X = m => ((m - RAIL_LO) / (RAIL_HI - RAIL_LO + 1)) * width;
+
+    // Chão: penumbra da extensão, depois a faixa acesa do confortável.
+    const slab = (lo, hi, fill) => svg.appendChild(svgEl("rect", {
+      x: X(Math.max(lo, RAIL_LO)), y: KEY_TOP,
+      width: Math.max(1, X(Math.min(hi, RAIL_HI) + 1) - X(Math.max(lo, RAIL_LO))),
+      height: KEY_H, fill,
+    }));
+    svg.appendChild(svgEl("rect", { x: 0, y: KEY_TOP, width, height: KEY_H, fill: cssVar("--ink") }));
+    slab(settings.stretch_low, settings.stretch_high, cssVar("--lit-soft"));
+    slab(settings.comfort_low, settings.comfort_high, cssVar("--lit"));
+
+    // Teclas pretas como sombra fina — dão endereço à régua sem virar ruído.
+    for (let m = RAIL_LO; m <= RAIL_HI; m++) {
+      if (!isBlackKey(m)) continue;
+      svg.appendChild(svgEl("rect", {
+        x: X(m) + 0.5, y: KEY_TOP, width: Math.max(1, X(m + 1) - X(m) - 1),
+        height: KEY_H * 0.55, fill: cssVar("--key-shade"),
+      }));
+    }
+    for (let m = Math.ceil(RAIL_LO / 12) * 12; m <= RAIL_HI; m += 12) {
+      svg.appendChild(svgEl("line", {
+        x1: X(m), y1: KEY_TOP, x2: X(m), y2: KEY_TOP + KEY_H,
+        stroke: cssVar("--rule-firm"), "stroke-width": 1,
+      }));
+    }
+
+    if (!song || typeof song.min_midi !== "number") return;
+
+    // Tinta: a música aberta, sobreposta ao seu alcance.
+    const lo = Math.max(song.min_midi, RAIL_LO), hi = Math.min(song.max_midi, RAIL_HI);
+    svg.appendChild(svgEl("line", {
+      x1: X(lo), y1: 4.5, x2: X(hi + 1), y2: 4.5,
+      stroke: cssVar("--silk-3"), "stroke-width": 1,
+    }));
+    const seg = (a, b, fill) => {
+      if (b < a) return;
+      svg.appendChild(svgEl("rect", {
+        x: X(a), y: 1, width: Math.max(1.5, X(b + 1) - X(a)), height: 7, fill,
+      }));
+    };
+    // Reparte o núcleo pelo que cabe e pelo que estoura.
+    const c0 = Math.round(song.core_low), c1 = Math.round(song.core_high);
+    seg(Math.max(c0, settings.stretch_low), Math.min(c1, settings.stretch_high), cssVar("--voice"));
+    if (c0 < settings.stretch_low) seg(c0, Math.min(c1, settings.stretch_low - 1), cssVar("--strain"));
+    if (c1 > settings.stretch_high) seg(Math.max(c0, settings.stretch_high + 1), c1, cssVar("--strain"));
   }
 
   function tagColor(tag) {
@@ -75,11 +142,11 @@ const Charts = (() => {
     const zoneG = svgEl("g");
     zoneG.appendChild(svgEl("rect", {
       x: X(settings.stretch_low), y: TOP - 6, width: X(settings.stretch_high + 1) - X(settings.stretch_low),
-      height: height - TOP - BOTTOM + 6, fill: cssVar("--accent-wash"),
+      height: height - TOP - BOTTOM + 6, fill: cssVar("--zone-stretch"),
     }));
     zoneG.appendChild(svgEl("rect", {
       x: X(settings.comfort_low), y: TOP - 6, width: X(settings.comfort_high + 1) - X(settings.comfort_low),
-      height: height - TOP - BOTTOM + 6, fill: cssVar("--accent-wash"),
+      height: height - TOP - BOTTOM + 6, fill: cssVar("--zone-comfort"),
     }));
     svg.appendChild(zoneG);
 
@@ -198,7 +265,7 @@ const Charts = (() => {
       x: x0, y: yFor(Math.min(settings.comfort_high + 1, range.high + 1)),
       width: x1 - x0,
       height: Math.max(0, yFor(Math.max(settings.comfort_low, range.low)) - yFor(Math.min(settings.comfort_high + 1, range.high + 1))),
-      fill: cssVar("--accent-wash"),
+      fill: cssVar("--zone-comfort"),
     }));
 
     for (let m = range.low; m <= range.high; m++) {
@@ -259,7 +326,7 @@ const Charts = (() => {
     svg.appendChild(svgEl("rect", {
       x: L, y: Y(settings.comfort_high + 1), width: width - L - R,
       height: Math.max(0, Y(settings.comfort_low) - Y(settings.comfort_high + 1)),
-      fill: cssVar("--accent-wash"),
+      fill: cssVar("--zone-comfort"),
     }));
 
     for (const m of pitchTicks(lo, hi)) {
@@ -276,10 +343,11 @@ const Charts = (() => {
     }
     svg.appendChild(svgEl("line", { x1: L, y1: height - B, x2: width - R, y2: height - B, class: "axis-line" }));
 
-    const path = (key, color) => {
+    // Ênfase: a mediana é o assunto, o teto é contexto em cinza.
+    const path = (key, color, w = 2) => {
       const d = profile.map((p, i) => `${i ? "L" : "M"}${X(p.t).toFixed(1)},${Y(p[key]).toFixed(1)}`).join(" ");
       svg.appendChild(svgEl("path", {
-        d, fill: "none", stroke: color, "stroke-width": 2,
+        d, fill: "none", stroke: color, "stroke-width": w,
         "stroke-linejoin": "round", "stroke-linecap": "round",
       }));
       const last = profile[profile.length - 1];
@@ -291,8 +359,8 @@ const Charts = (() => {
       lab.textContent = midiToName(last[key]);
       svg.appendChild(lab);
     };
-    path("p90", cssVar("--series-2"));
-    path("median", cssVar("--accent"));
+    path("p90", cssVar("--series-2"), 1.5);
+    path("median", cssVar("--accent"), 2);
 
     // Camada de hover: crosshair + tooltip com os dois valores.
     const cross = svgEl("line", {
@@ -321,7 +389,7 @@ const Charts = (() => {
 
     if (legendEl) legend(legendEl, [
       { color: cssVar("--accent"), label: "altura mediana", line: true },
-      { color: cssVar("--series-2"), label: "teto (90% das notas abaixo)", line: true },
+      { color: cssVar("--series-2"), label: "teto: 90% das notas abaixo", line: true },
     ]);
   }
 
@@ -509,27 +577,37 @@ const Charts = (() => {
     const hi = Math.max(settings.stretch_high, settings.comfort_high) + 5;
     const X = m => L + ((m - lo) / (hi - lo)) * (width - L - R);
 
-    // Teclado de referência: o desenho das teclas ancora a leitura da faixa.
-    // A escala segue cromática (um semitom = uma largura) para que a faixa
-    // sombreada continue linear; as pretas ficam mais estreitas e mais curtas,
-    // que é o que faz o desenho ser lido como teclado.
     const KEY_H = 34;
+
+    // As faixas são o chão; o teclado se desenha por cima delas, como grade.
+    // A escala é cromática (um semitom = uma largura) para que a faixa continue
+    // linear — as pretas ficam mais estreitas e curtas, e é isso que faz o
+    // desenho ser lido como teclado.
+    const band = (l, h, fill, y, hgt) => svg.appendChild(svgEl("rect", {
+      x: X(l), y, width: X(h + 1) - X(l), height: hgt, fill,
+    }));
+    band(settings.stretch_low, settings.stretch_high, cssVar("--zone-stretch"), T - 10, KEY_H + 20);
+    band(settings.comfort_low, settings.comfort_high, cssVar("--zone-comfort"), T - 10, KEY_H + 20);
+
     for (let m = Math.ceil(lo); m <= hi; m++) {
       if (isBlackKey(m)) continue;
-      const w = X(m + 1) - X(m);
-      svg.appendChild(svgEl("rect", {
-        x: X(m), y: T, width: Math.max(1, w), height: KEY_H,
-        fill: cssVar("--surface-1"), stroke: cssVar("--axis"), "stroke-width": 1,
+      svg.appendChild(svgEl("line", {
+        x1: X(m), y1: T, x2: X(m), y2: T + KEY_H,
+        stroke: cssVar("--rule-firm"), "stroke-width": 1,
       }));
     }
     for (let m = Math.ceil(lo); m <= hi; m++) {
       if (!isBlackKey(m)) continue;
       const w = X(m + 1) - X(m);
       svg.appendChild(svgEl("rect", {
-        x: X(m) + w * 0.2, y: T, width: Math.max(1.5, w * 0.6), height: KEY_H * 0.62,
-        fill: cssVar("--text-secondary"), rx: 1,
+        x: X(m) + w * 0.2, y: T, width: Math.max(1.5, w * 0.6), height: KEY_H * 0.6,
+        fill: cssVar("--key-ink"),
       }));
     }
+    svg.appendChild(svgEl("line", {
+      x1: L, y1: T + KEY_H, x2: width - R, y2: T + KEY_H, class: "axis-line",
+    }));
+
     // Dó de cada oitava rotulado: sem isso o teclado não tem endereço.
     for (let m = Math.ceil(lo / 12) * 12; m <= hi; m += 12) {
       const t = svgEl("text", {
@@ -540,11 +618,7 @@ const Charts = (() => {
       svg.appendChild(t);
     }
 
-    const band = (l, h, fill, y, hgt) => svg.appendChild(svgEl("rect", {
-      x: X(l), y, width: X(h + 1) - X(l), height: hgt, fill, rx: 3,
-    }));
-    band(settings.stretch_low, settings.stretch_high, cssVar("--accent-wash"), T - 16, 66);
-    band(settings.comfort_low, settings.comfort_high, cssVar("--accent"), T + 38, 8);
+    band(settings.comfort_low, settings.comfort_high, cssVar("--silk-2"), T + KEY_H + 6, 4);
 
     const mk = (m, text, anchor) => {
       const t = svgEl("text", { x: X(m), y: 16, class: "tick", "text-anchor": anchor, fill: cssVar("--text-secondary") });
@@ -556,7 +630,7 @@ const Charts = (() => {
 
     const cl = svgEl("text", {
       x: (X(settings.comfort_low) + X(settings.comfort_high + 1)) / 2, y: height - 4,
-      class: "tick", "text-anchor": "middle", fill: cssVar("--accent"),
+      class: "tick", "text-anchor": "middle", fill: cssVar("--silk-2"),
     });
     cl.textContent = `confortável ${midiToName(settings.comfort_low)}–${midiToName(settings.comfort_high)} · ${settings.comfort_high - settings.comfort_low} semitons`;
     svg.appendChild(cl);
@@ -598,7 +672,7 @@ const Charts = (() => {
 
     svg.appendChild(svgEl("rect", {
       x: X(settings.comfort_low), y: T - 10, width: X(settings.comfort_high + 1) - X(settings.comfort_low),
-      height: height - T - 8, fill: cssVar("--accent-wash"),
+      height: height - T - 8, fill: cssVar("--zone-comfort"),
     }));
     for (const m of pitchTicks(lo, hi)) {
       svg.appendChild(svgEl("line", { x1: X(m), y1: T - 10, x2: X(m), y2: height - 22, class: "tick-line" }));
@@ -638,7 +712,7 @@ const Charts = (() => {
   }
 
   return {
-    rangeChart, histChart, profileChart, transposeChart, transposeCurve,
+    registerRail, rangeChart, histChart, profileChart, transposeChart, transposeCurve,
     climbChart, rangePreview, tagCompare, legend, tagColor, TAG_LABEL,
   };
 })();

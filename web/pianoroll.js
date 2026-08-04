@@ -19,6 +19,8 @@ const PianoRoll = (() => {
   let hitRects = [];
   let onSeek = null;
   let drag = null;
+  let reveal = 1;       // 0→1: as notas entram da esquerda, como a música tocando
+  let revealRAF = null;
 
   function init(canvasEl, opts = {}) {
     canvas = canvasEl;
@@ -42,7 +44,29 @@ const PianoRoll = (() => {
     view = { t0: 0, t1: payload.duration || 1 };
     transpose = 0;
     playhead = null;
-    render();
+    startReveal();
+  }
+
+  /* Um único momento de movimento em toda a interface: ao abrir uma música,
+     as notas aparecem no sentido do tempo. Quem pediu menos movimento no
+     sistema recebe o desenho pronto. */
+  function startReveal() {
+    if (revealRAF) cancelAnimationFrame(revealRAF);
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      reveal = 1;
+      render();
+      return;
+    }
+    reveal = 0;
+    const t0 = performance.now();
+    const DUR = 620;
+    const step = now => {
+      const k = Math.min(1, (now - t0) / DUR);
+      reveal = 1 - Math.pow(1 - k, 3);   // desacelera no fim
+      render();
+      revealRAF = k < 1 ? requestAnimationFrame(step) : null;
+    };
+    revealRAF = requestAnimationFrame(step);
   }
 
   function setTranspose(v) { transpose = v; render(); }
@@ -113,17 +137,21 @@ const PianoRoll = (() => {
       primary: cssVar("--text-primary"),
       accent: cssVar("--accent"),
       accentSoft: cssVar("--accent-soft"),
-      accentWash: cssVar("--accent-wash"),
       alert: cssVar("--alert"),
-      alertWash: cssVar("--alert-wash"),
       plane: cssVar("--plane"),
+      keyShade: cssVar("--key-shade"),
+      zoneComfort: cssVar("--zone-comfort"),
+      zoneStretch: cssVar("--zone-stretch"),
+      lamp: cssVar("--lamp"),
     };
 
     ctx.fillStyle = C.surface;
     ctx.fillRect(0, 0, w, h);
 
-    drawRows(p, rh, C);
+    // Ordem importa: as faixas do cantor são o chão (superfícies opacas), e as
+    // teclas pretas são uma sombra por cima delas — não o contrário.
     drawZones(p, C);
+    drawRows(p, rh, C);
     drawTimeGrid(p, C);
     drawContour(p, C);
     drawNotes(p, rh, C);
@@ -136,7 +164,7 @@ const PianoRoll = (() => {
     // Linhas de tecla preta levemente rebaixadas dão a leitura de "teclado deitado".
     for (let m = lowMidi; m <= highMidi; m++) {
       if (!isBlackKey(m)) continue;
-      ctx.fillStyle = C.plane;
+      ctx.fillStyle = C.keyShade;
       ctx.fillRect(p.x, midiToY(m + 1), p.w, rh);
     }
     ctx.strokeStyle = C.grid;
@@ -159,14 +187,13 @@ const PianoRoll = (() => {
       ctx.fillStyle = fill;
       ctx.fillRect(p.x, yTop, p.w, yBot - yTop);
     };
-    // Esticada primeiro (mais larga), confortável por cima (mais forte).
-    band(settings.stretch_low, settings.stretch_high, C.accentWash);
-    band(settings.comfort_low, settings.comfort_high, C.accentWash);
+    // Penumbra da extensão primeiro, faixa acesa do confortável por cima.
+    band(settings.stretch_low, settings.stretch_high, C.zoneStretch);
+    band(settings.comfort_low, settings.comfort_high, C.zoneComfort);
 
+    // Fio firme marcando onde o confortável termina — é a fronteira que importa.
     ctx.save();
-    ctx.setLineDash([]);
-    ctx.strokeStyle = C.accent;
-    ctx.globalAlpha = 0.55;
+    ctx.strokeStyle = C.axis;
     ctx.lineWidth = 1;
     for (const m of [settings.comfort_low, settings.comfort_high + 1]) {
       const y = Math.round(midiToY(m)) + 0.5;
@@ -178,17 +205,8 @@ const PianoRoll = (() => {
     }
     ctx.restore();
 
-    // Rótulo da faixa, encostado à direita para não competir com as notas.
-    ctx.save();
-    ctx.font = "500 10.5px " + cssVar("--font");
-    ctx.fillStyle = C.accent;
-    ctx.textAlign = "right";
-    ctx.textBaseline = "top";
-    const yTop = midiToY(settings.comfort_high + 1);
-    if (yTop > p.y && yTop < p.y + p.h - 12) {
-      ctx.fillText("meu confortável", p.x + p.w - 8, yTop + 3);
-    }
-    ctx.restore();
+    // Sem rótulo dentro do gráfico: a régua no cabeçalho, a legenda e a própria
+    // faixa acesa já dizem o que ela é, e um texto aqui cairia sobre as notas.
   }
 
   function drawTimeGrid(p, C) {
@@ -218,9 +236,9 @@ const PianoRoll = (() => {
     ctx.beginPath();
     ctx.rect(p.x, p.y, p.w, p.h);
     ctx.clip();
-    ctx.strokeStyle = C.secondary;
-    ctx.globalAlpha = 0.5;
-    ctx.lineWidth = 1.25;
+    ctx.strokeStyle = C.muted;
+    ctx.globalAlpha = 0.55;
+    ctx.lineWidth = 1.1;
     ctx.lineJoin = "round";
     ctx.lineCap = "round";
     let pen = false;
@@ -248,8 +266,11 @@ const PianoRoll = (() => {
     const barH = Math.max(2, rh - 2);
     const radius = Math.min(3, barH / 2);
 
+    const revealUntil = view.t0 + (view.t1 - view.t0) * reveal;
+
     for (const n of data.notes) {
       if (n.t1 < view.t0 || n.t0 > view.t1) continue;
+      if (reveal < 1 && n.t0 > revealUntil) continue;
       const m = n.midi + transpose;
       if (m < lowMidi - 1 || m > highMidi + 1) continue;
 
@@ -300,7 +321,7 @@ const PianoRoll = (() => {
     for (let m = lowMidi; m <= highMidi; m++) {
       const y = midiToY(m + 1);
       const black = isBlackKey(m);
-      ctx.fillStyle = black ? C.axis : C.surface;
+      ctx.fillStyle = black ? C.plane : C.surface;
       ctx.fillRect(black ? GUTTER - 22 : 0, y + 0.5, black ? 22 : GUTTER, Math.max(1, rh - 1));
       if (!black) {
         ctx.strokeStyle = C.grid;
@@ -313,7 +334,7 @@ const PianoRoll = (() => {
       const isC = ((m % 12) + 12) % 12 === 0;
       if ((isC || showEveryNote) && !black && rh >= 8) {
         ctx.fillStyle = isC ? C.secondary : C.muted;
-        ctx.font = (isC ? "600 " : "400 ") + Math.min(10.5, rh * 0.72) + "px " + cssVar("--font");
+        ctx.font = (isC ? "600 " : "400 ") + Math.min(10, rh * 0.7) + "px " + cssVar("--mono");
         ctx.textAlign = "left";
         ctx.textBaseline = "middle";
         ctx.fillText(midiToName(m), 5, y + rh / 2);
@@ -338,7 +359,7 @@ const PianoRoll = (() => {
 
     const step = niceTimeStep(view.t1 - view.t0, p.w);
     ctx.fillStyle = C.muted;
-    ctx.font = "400 10.5px " + cssVar("--font");
+    ctx.font = "400 10px " + cssVar("--mono");
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
     for (let t = Math.ceil(view.t0 / step) * step; t <= view.t1; t += step) {

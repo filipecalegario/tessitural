@@ -41,13 +41,13 @@ as dependências (inclui PyTorch, ~2 GB). Variável `PORT` muda a porta.
 
 ## Como usar
 
-1. **Meu alcance** — diga onde fica sua voz. Duas faixas: o *confortável*, onde você canta
+1. **Minha voz** — diga onde fica sua voz. Duas faixas: o *confortável*, onde você canta
    sem pensar, e a *extensão*, até onde você chega forçando. Não precisa acertar de
    primeira; depois de analisar algumas músicas a aba sugere valores a partir das que você
-   marcou como confortáveis.
-2. **Nova análise** — cole o link ou digite o nome da música. Classifique como confortável /
+   marcou como confortáveis. A régua no topo da tela mostra esse alcance o tempo todo.
+2. **Analisar** — cole o link ou digite o nome da música. Classifique como confortável /
    difícil / não sei. Leva alguns minutos: a separação do vocal é a parte demorada.
-3. **Música** — o mapa de notas, as estatísticas e a leitura em texto do que está acontecendo.
+3. **Música** — o veredito em uma frase, o mapa de notas e os detalhes.
 4. **Biblioteca** — todas as músicas na mesma régua. É aqui que o padrão aparece.
 
 ## O que cada visualização responde
@@ -124,11 +124,11 @@ graph TB
 
     YT(["YouTube"]) -.única saída de rede.-> DL
 
-    style browser fill:none,stroke:#2a78d6
-    style server fill:none,stroke:#2a78d6
-    style disk fill:none,stroke:#898781
-    style work fill:none,stroke:#898781,stroke-dasharray: 4 3
-    style YT fill:none,stroke:#898781
+    style browser fill:none,stroke:#3F8FF5
+    style server fill:none,stroke:#3F8FF5
+    style disk fill:none,stroke:#6F6D66
+    style work fill:none,stroke:#6F6D66,stroke-dasharray: 4 3
+    style YT fill:none,stroke:#6F6D66
 ```
 
 ### O pipeline de análise
@@ -174,9 +174,9 @@ flowchart TD
 
     S1 & S2 & S3 & S4 & S5 --> OUT[("analysis.json")]
 
-    style GATE fill:none,stroke:#d03b3b,stroke-width:2px
-    style JUNK fill:none,stroke:#d03b3b,stroke-width:2px
-    style OUT fill:none,stroke:#2a78d6,stroke-width:2px
+    style GATE fill:none,stroke:#EE6055,stroke-width:2px
+    style JUNK fill:none,stroke:#EE6055,stroke-width:2px
+    style OUT fill:none,stroke:#3F8FF5,stroke-width:2px
 ```
 
 ### Ciclo de vida de uma análise
@@ -330,11 +330,15 @@ O Demucs roda em PyTorch, que já acelera na GPU do Apple Silicon via Metal (MPS
 automática para CPU se algo falhar. Não há port maduro do Demucs para MLX, e o pYIN é DSP
 sequencial que não se beneficiaria de GPU.
 
-**Por que a cor não carrega o significado sozinha.**
-No piano roll, a posição vertical de cada nota contra a faixa sombreada já diz se ela cabe
-no seu alcance — a cor apenas reforça. A paleta é azul (contexto) × vermelho (o que
-estoura), validada para daltonismo: ΔE 23,8 em protanopia, contra ΔE 4,1 do par
-verde/vermelho que seria a escolha ingênua. Todo gráfico tem legenda e visão em tabela.
+**Por que a sua voz não é uma cor.**
+A interface tem três papéis visuais que nunca se misturam: a **sua voz** é uma superfície
+iluminada (o chão contra o qual se mede), a **música** é tinta (azul o que está ao alcance,
+coral o que estoura) e o **âmbar** é identidade — marca, aba ativa, foco — e nunca encosta
+em dado. Pintar a sua faixa de âmbar foi testado e reprovado: ΔE 14,0 contra o coral,
+indistinguível até com visão normal. O par azul↔coral passa em tudo (ΔE 22,9 em protanopia).
+Verde × vermelho, a escolha ingênua para "confortável × difícil", falha com ΔE 4,1 em
+deuteranopia. Além disso, no piano roll a posição vertical já diz se a nota cabe; a cor só
+reforça. Todo gráfico tem legenda, e os principais têm visão em tabela.
 
 **Por que uma fila com um worker só.**
 Dois Demucs simultâneos brigariam por memória. A fila serializa; o tempo de espera aparece

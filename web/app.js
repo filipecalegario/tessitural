@@ -1,6 +1,6 @@
 /* Tessitural — estado, roteamento e ligação entre API e visualizações. */
 
-const ROLL_GEOM = { height: 440, padTop: 8, padBottom: 24 };
+const ROLL_GEOM = { height: 460, padTop: 8, padBottom: 24 };
 
 const state = {
   settings: null,
@@ -57,18 +57,31 @@ function route() {
 /* ---------------- Tema ---------------- */
 
 const themeBtn = document.getElementById("theme-toggle");
+/* O painel escuro é o padrão do produto, não uma preferência do sistema.
+   O claro existe para quem quiser imprimir ou trabalhar no sol. */
 themeBtn.addEventListener("click", () => {
-  const cur = document.documentElement.getAttribute("data-theme");
-  const next = cur === "dark" ? "light" : cur === "light" ? null : (matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "dark");
-  if (next) document.documentElement.setAttribute("data-theme", next);
-  else document.documentElement.removeAttribute("data-theme");
-  localStorage.setItem("tessitural-theme", next || "");
+  const light = document.documentElement.getAttribute("data-theme") === "light";
+  if (light) document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.setAttribute("data-theme", "light");
+  localStorage.setItem("tessitural-theme", light ? "dark" : "light");
   redrawEverything();
 });
-const savedTheme = localStorage.getItem("tessitural-theme");
-if (savedTheme) document.documentElement.setAttribute("data-theme", savedTheme);
+if (localStorage.getItem("tessitural-theme") === "light") {
+  document.documentElement.setAttribute("data-theme", "light");
+}
+
+function drawRail() {
+  const s = state.settings;
+  if (!s) return;
+  const open = state.song && state.song.stats && typeof state.song.stats.min_midi === "number"
+    ? state.song.stats : null;
+  Charts.registerRail(document.getElementById("register-rail"), s, open);
+  document.getElementById("rail-readout").textContent =
+    `${midiToName(s.comfort_low)}–${midiToName(s.comfort_high)}`;
+}
 
 function redrawEverything() {
+  drawRail();
   PianoRoll.render();
   if (state.song) renderSong();
   renderLibrary();
@@ -102,7 +115,7 @@ function renderLibrary() {
   const warn = document.getElementById("library-warning");
   if (failed) {
     warn.hidden = false;
-    warn.innerHTML = `<div class="callout alert">${failed} música${failed > 1 ? "s" : ""} sem vocal detectado — fora dos gráficos. Provável instrumental, ou separação que não encontrou voz.</div>`;
+    warn.innerHTML = `<div class="warn-strip">${failed} música${failed > 1 ? "s" : ""} sem vocal detectado — fora dos gráficos. Provável instrumental, ou separação que não encontrou voz.</div>`;
   } else {
     warn.hidden = true;
   }
@@ -111,7 +124,7 @@ function renderLibrary() {
     { color: Charts.tagColor("comfortable"), label: "confortável para você" },
     { color: Charts.tagColor("hard"), label: "difícil para você" },
     { color: Charts.tagColor("neutral"), label: "sem classificação" },
-    { color: cssVar("--accent-wash"), label: "faixa sombreada = seu alcance" },
+    { color: cssVar("--zone-comfort"), label: "faixa acesa = seu confortável", outline: true },
   ]);
 
   const sorted = [...songs].sort((a, b) => a.median_midi - b.median_midi);
@@ -175,9 +188,9 @@ function renderSong() {
     document.getElementById("song-meta").textContent = meta.artist || "";
     document.getElementById("song-stats").innerHTML = "";
     document.getElementById("song-verdict").innerHTML =
-      `<div class="callout alert">Nenhuma nota vocal foi detectada nesta faixa.
-       Se ela tem canto, tente reanalisar com a separação de stems ligada —
-       sobre a mixagem completa o detector se perde entre os instrumentos.</div>`;
+      `<p class="verdict-lead">Nenhuma nota vocal <span class="hi">detectada</span>.</p>
+       <ul class="verdict-notes"><li>Se a faixa tem canto, reanalise com a separação de stems
+       ligada — sobre a mixagem completa o detector se perde entre os instrumentos.</li></ul>`;
     return;
   }
 
@@ -206,6 +219,7 @@ function renderSong() {
     { color: cssVar("--alert"), label: "fora do alcance" },
   ]);
 
+  drawRail();
   drawHistogram();
   Charts.profileChart(document.getElementById("profile-chart"), st.profile, s, document.getElementById("profile-legend"));
   drawTransposeChart();
@@ -248,44 +262,45 @@ function renderSongStats(st, s, d) {
 
   const cells = [
     {
-      label: "Tessitura exigida",
-      value: `${st.min_note} – ${st.max_note}`,
-      foot: `${st.range_semitones} semitons de extensão`,
+      k: "Tessitura",
+      v: `${st.min_note}–${st.max_note}`,
+      f: `${st.range_semitones} semitons de extensão`,
     },
     {
-      label: "Onde a voz fica 90% do tempo",
-      value: `${midiToName(st.core_low)} – ${midiToName(st.core_high)}`,
-      foot: `mediana em ${st.median_note}`,
+      k: "90% do tempo",
+      v: `${midiToName(st.core_low)}–${midiToName(st.core_high)}`,
+      f: `mediana em ${st.median_note}`,
     },
     {
-      label: "Nota mais aguda",
-      value: st.max_note,
-      foot: `aos ${fmtTime(st.max_at)}` + (outHigh ? ` · ${outHigh} st acima do seu confortável` : " · dentro do seu confortável"),
-      alert: st.max_midi > s.stretch_high,
+      k: "Mais aguda",
+      v: st.max_note,
+      f: `aos ${fmtTime(st.max_at)}` + (outHigh ? ` · ${outHigh} st acima do confortável` : " · dentro do confortável"),
+      alarm: st.max_midi > s.stretch_high,
     },
     {
-      label: "Nota mais grave",
-      value: st.min_note,
-      foot: `aos ${fmtTime(st.min_at)}` + (outLow ? ` · ${outLow} st abaixo do seu confortável` : " · dentro do seu confortável"),
-      alert: st.min_midi < s.stretch_low,
+      k: "Mais grave",
+      v: st.min_note,
+      f: `aos ${fmtTime(st.min_at)}` + (outLow ? ` · ${outLow} st abaixo do confortável` : " · dentro do confortável"),
+      alarm: st.min_midi < s.stretch_low,
     },
     {
-      label: "Tom",
-      value: st.key && st.key.name ? st.key.name : "—",
-      foot: st.key && st.key.name_pt ? st.key.name_pt : "",
+      k: "Tom",
+      v: st.key && st.key.name ? st.key.name : "—",
+      f: st.key && st.key.name_pt ? st.key.name_pt : "",
     },
     {
-      label: "Quanto sobe do início ao fim",
-      value: st.climb ? fmtSemitones(st.climb.delta) : "—",
-      foot: st.climb && st.climb.delta >= 2 ? "vai ficando mais aguda" : st.climb && st.climb.delta <= -2 ? "vai ficando mais grave" : "altura estável",
+      k: "Sobe",
+      v: st.climb ? fmtSemitones(st.climb.delta) : "—",
+      f: st.climb && st.climb.delta >= 2 ? "vai ficando mais aguda"
+        : st.climb && st.climb.delta <= -2 ? "vai ficando mais grave" : "altura estável",
     },
   ];
 
   document.getElementById("song-stats").innerHTML = cells.map(c => `
-    <div class="stat">
-      <div class="label">${c.label}</div>
-      <div class="value${c.alert ? " is-alert" : ""}">${c.value}</div>
-      <div class="foot">${c.foot || ""}</div>
+    <div class="readout">
+      <div class="k">${c.k}</div>
+      <div class="v${c.alarm ? " alarm" : ""}">${c.v}</div>
+      <div class="f">${c.f || ""}</div>
     </div>`).join("");
 }
 
@@ -307,34 +322,44 @@ function renderVerdict(st, s, d) {
   const best = curve.reduce((a, b) => (b.comfort > a.comfort ? b : a), curve[0]);
   const now = curve.find(c => c.shift === 0);
 
-  const parts = [];
-  parts.push(`<b>${pct(inComfort)}%</b> do tempo cantado cai no seu confortável, <b>${pct(inStretch)}%</b> na esticada e <b>${pct(out)}%</b> fora do seu alcance.`);
-
   const above = st.max_midi - s.comfort_high;
   const below = s.comfort_low - st.min_midi;
+
+  // A manchete diz onde aperta. É a resposta que a pessoa veio buscar.
+  let lead;
   if (above > 0 && below > 0) {
-    parts.push(`Ela puxa nas duas pontas: <b>${above} semitons</b> acima e <b>${below}</b> abaixo do seu confortável.`);
+    lead = `Puxa <span class="hi">${above} semitons</span> acima e <span class="hi">${below}</span> abaixo do seu confortável.`;
   } else if (above > 0) {
-    parts.push(`O aperto é no agudo: a nota mais alta fica <b>${above} semitons</b> acima do seu confortável.`);
+    lead = `Pede <span class="hi">${above} semitons</span> acima do seu confortável.`;
   } else if (below > 0) {
-    parts.push(`O aperto é no grave: a nota mais baixa fica <b>${below} semitons</b> abaixo do seu confortável.`);
+    lead = `Desce <span class="hi">${below} semitons</span> abaixo do seu confortável.`;
   } else {
-    parts.push(`A música inteira cabe no seu confortável.`);
+    lead = `Cabe <span class="ok">inteira</span> no seu confortável.`;
   }
 
+  const lines = [];
+  lines.push(`Do tempo cantado, <b>${pct(inComfort)}%</b> cai no confortável, <b>${pct(inStretch)}%</b> na esticada e <b>${pct(out)}%</b> fora do alcance.`);
+
   if (best.shift !== 0 && best.comfort - now.comfort > 0.05) {
-    parts.push(`Transpondo <b>${best.shift > 0 ? "+" : ""}${best.shift} semitons</b>, você subiria para <b>${Math.round(best.comfort * 100)}%</b> no confortável.`);
+    lines.push(`Transpondo <b>${best.shift > 0 ? "+" : ""}${best.shift} semitons</b>, o confortável sobe para <b>${Math.round(best.comfort * 100)}%</b>.`);
   } else {
-    parts.push(`O tom original já é o melhor para a sua voz — transpor não ajuda.`);
+    lines.push(`O tom original já é o melhor para a sua voz. Transpor não ajuda.`);
   }
 
   if (st.climb && st.climb.delta >= 2) {
-    parts.push(`Ela também <b>sobe ${fmtSemitones(st.climb.delta)}</b> do início para o fim, então o esforço se concentra no final.`);
+    lines.push(`Sobe <b>${fmtSemitones(st.climb.delta)}</b> do início para o fim — o esforço se concentra no final.`);
+  } else if (st.climb && st.climb.delta <= -2) {
+    lines.push(`Desce <b>${fmtSemitones(st.climb.delta)}</b> do início para o fim — começa no ponto mais alto.`);
   }
 
-  const severe = pct(out) >= 10 || above > (s.stretch_high - s.comfort_high) || below > (s.comfort_low - s.stretch_low);
+  const longest = (st.demanding || [])[0];
+  if (longest) {
+    lines.push(`O agudo mais exposto é <b>${midiToName(longest.midi)}</b> aos <b>${fmtTime(longest.t0)}</b>.`);
+  }
+
   document.getElementById("song-verdict").innerHTML =
-    `<div class="callout${severe ? " alert" : ""}">${parts.join(" ")}</div>`;
+    `<p class="verdict-lead">${lead}</p>` +
+    `<ul class="verdict-notes">${lines.map(n => `<li>${n}</li>`).join("")}</ul>`;
 }
 
 function renderDemanding(st, s) {
@@ -521,6 +546,7 @@ async function pollJob(id) {
 function renderJobs() {
   const host = document.getElementById("jobs");
   const jobs = [...state.jobs.values()].reverse();
+  document.getElementById("jobs-wrap").hidden = jobs.length === 0;
   host.innerHTML = jobs.map(j => {
     const running = j.status === "running" || j.status === "queued";
     const lines = (j.progress || []).slice(-8).map(p => `<div>${escapeHtml(p.message)}</div>`).join("");
@@ -586,6 +612,7 @@ document.getElementById("btn-save-range").addEventListener("click", async () => 
   state.settings = await api("/settings", { method: "PUT", body: JSON.stringify(draft) });
   msg.textContent = "Alcance salvo.";
   msg.style.color = "var(--text-muted)";
+  drawRail();
   renderRangeView();
   renderLibrary();
   if (state.song) { PianoRoll.setSettings(state.settings); renderSong(); }
@@ -598,7 +625,7 @@ function renderSuggestion() {
   const host = document.getElementById("range-suggestion");
   const easy = state.songs.filter(s => s.tag === "comfortable" && typeof s.min_midi === "number");
   if (!easy.length) {
-    host.innerHTML = `<div class="empty">Classifique ao menos uma música como confortável para ver uma sugestão.</div>`;
+    host.innerHTML = `<div class="empty">Marque ao menos uma música como confortável e eu estimo seu alcance a partir dela.</div>`;
     return;
   }
   const low = Math.round(easy.reduce((a, s) => a + s.core_low, 0) / easy.length);
@@ -607,11 +634,11 @@ function renderSuggestion() {
   const absHigh = Math.max(...easy.map(s => s.max_midi));
 
   host.innerHTML = `
-    <div class="callout">
-      Com base em <b>${easy.length} música${easy.length > 1 ? "s" : ""}</b> que você marcou como confortável:
-      o núcleo delas fica entre <b>${midiToName(low)}</b> e <b>${midiToName(high)}</b>,
-      e os extremos absolutos vão de <b>${midiToName(absLow)}</b> a <b>${midiToName(absHigh)}</b>.
-    </div>
+    <p class="suggestion">
+      Em <b>${easy.length}</b> música${easy.length > 1 ? "s" : ""} que você marcou como confortável,
+      o núcleo fica entre <b>${midiToName(low)}</b> e <b>${midiToName(high)}</b>,
+      e os extremos vão de <b>${midiToName(absLow)}</b> a <b>${midiToName(absHigh)}</b>.
+    </p>
     <button class="ghost" id="apply-suggestion">Usar esses valores</button>`;
 
   document.getElementById("apply-suggestion").addEventListener("click", () => {
@@ -652,6 +679,7 @@ window.addEventListener("resize", () => {
 
   state.settings = await api("/settings");
   await loadLibrary();
+  drawRail();
 
   // Retoma análises que já estavam rodando quando a página foi recarregada.
   try {

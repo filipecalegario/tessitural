@@ -3,100 +3,106 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Tessitural — análise de tessitura vocal</title>
+<title>Tessitural</title>
 <link rel="stylesheet" href="style.css">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎤</text></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23131317'/><rect x='14' y='40' width='72' height='20' fill='%23E9A23B'/><rect x='26' y='18' width='9' height='64' fill='%233F8FF5'/><rect x='46' y='10' width='9' height='72' fill='%233F8FF5'/><rect x='66' y='26' width='9' height='56' fill='%23EE6055'/></svg>">
 </head>
 <body>
 
 <header class="topbar">
-  <div class="brand">Tessitural <span>análise de tessitura vocal</span></div>
+  <div class="brand">Tessi<em>tural</em></div>
+
+  <!-- Assinatura: sua voz fica permanentemente à vista, e a música aberta
+       se sobrepõe a ela. O contexto nunca sai da tela. -->
+  <div class="rail">
+    <div class="rail-label">Minha voz<b id="rail-readout">—</b></div>
+    <svg id="register-rail" width="300" height="30" aria-label="Régua do seu alcance vocal"></svg>
+  </div>
+
   <nav class="tabs">
     <button data-view="library">Biblioteca</button>
     <button data-view="song">Música</button>
-    <button data-view="new">Nova análise</button>
-    <button data-view="range">Meu alcance</button>
+    <button data-view="new">Analisar</button>
+    <button data-view="range">Minha voz</button>
   </nav>
-  <button class="icon-btn" id="theme-toggle" title="Alternar tema claro/escuro" aria-label="Alternar tema">◐</button>
+  <button class="icon-btn" id="theme-toggle" title="Alternar claro / escuro" aria-label="Alternar tema">◐</button>
 </header>
 
 <main>
 
-  <!-- ============ BIBLIOTECA ============ -->
+  <!-- ═══════════════ BIBLIOTECA ═══════════════ -->
   <section class="view" id="view-library">
-    <h1>Biblioteca</h1>
-    <p class="page-sub">Cada música é uma linha. A faixa vertical azul é o seu alcance confortável — o que passa dela é o que força.</p>
+    <div class="page-head">
+      <h1>Onde cada música<br>pede que você vá</h1>
+      <p class="page-sub">A faixa acesa é o seu confortável. O que passa dela é o que força.</p>
+    </div>
 
     <div id="library-warning" hidden></div>
 
-    <div id="library-empty" class="card" hidden>
+    <div id="library-empty" class="register plain" hidden>
       <div class="empty">
-        Nenhuma música analisada ainda.<br>
-        Vá em <b>Nova análise</b> e cole um link do YouTube para começar.
+        Nenhuma música analisada ainda. Vá em <b>Analisar</b> e cole um link do YouTube —
+        ou só digite o nome da música, que eu procuro.
       </div>
     </div>
 
-    <div class="card" id="library-chart-card" hidden>
-      <div class="card-head">
-        <h2>Tessitura exigida por música</h2>
-        <p class="sub">Linha fina = extremos absolutos · barra grossa = onde a voz fica 90% do tempo · ponto = altura mediana</p>
+    <div class="register" id="library-chart-card" hidden>
+      <div class="eyebrow">
+        Tessitura exigida
+        <span class="hint">Linha fina: os extremos. Barra: onde a voz fica 90% do tempo. Ponto: a altura mediana.</span>
       </div>
-      <div class="legend" id="library-legend"></div>
-      <div class="scroll-x"><svg class="chart" id="range-chart"></svg></div>
-      <details class="table-view">
-        <summary>Ver como tabela</summary>
-        <div class="scroll-x"><table class="data" id="library-table"></table></div>
-      </details>
+      <div class="register-body">
+        <div class="legend" id="library-legend" style="margin-bottom:18px;"></div>
+        <div class="scroll-x"><svg class="chart" id="range-chart"></svg></div>
+        <details class="table-view">
+          <summary>Ver como tabela</summary>
+          <div class="scroll-x"><table class="data" id="library-table"></table></div>
+        </details>
+      </div>
     </div>
 
     <div class="two-col" id="library-insights" hidden>
-      <div class="card">
-        <div class="card-head">
-          <h2>Confortáveis × difíceis</h2>
-          <p class="sub">Média das músicas que você classificou, comparada ao seu alcance</p>
-        </div>
-        <div id="tag-compare"></div>
+      <div class="register">
+        <div class="eyebrow">Confortáveis<br>× difíceis</div>
+        <div class="register-body" id="tag-compare"></div>
       </div>
-      <div class="card">
-        <div class="card-head">
-          <h2>Quanto cada música sobe</h2>
-          <p class="sub">Diferença de altura entre o terço final e o terço inicial</p>
-        </div>
-        <div class="scroll-x"><svg class="chart" id="climb-chart"></svg></div>
+      <div class="register">
+        <div class="eyebrow">Quanto sobe<span class="hint">Do terço inicial ao final.</span></div>
+        <div class="register-body scroll-x"><svg class="chart" id="climb-chart"></svg></div>
       </div>
     </div>
   </section>
 
-  <!-- ============ MÚSICA ============ -->
+  <!-- ═══════════════ MÚSICA ═══════════════ -->
   <section class="view" id="view-song">
-    <div id="song-empty" class="empty">Escolha uma música na biblioteca.</div>
+    <div id="song-empty" class="register plain">
+      <div class="empty">Escolha uma música na biblioteca.</div>
+    </div>
 
     <div id="song-content" hidden>
-      <div class="row" style="margin-bottom:6px; align-items:center;">
-        <div>
-          <h1 id="song-title">—</h1>
-          <p class="page-sub" id="song-meta">—</p>
-        </div>
-        <div class="shrink" style="display:flex; gap:8px; align-items:center;">
-          <div class="seg" id="song-tag" role="group" aria-label="Classificação">
-            <button data-tag="comfortable">Confortável</button>
-            <button data-tag="neutral">Sem classificar</button>
-            <button data-tag="hard">Difícil</button>
+      <div class="page-head">
+        <div class="row" style="align-items:flex-end;">
+          <div>
+            <h1 id="song-title">—</h1>
+            <p class="page-sub note-strip" id="song-meta">—</p>
           </div>
-          <button class="ghost danger" id="song-delete">Excluir</button>
+          <div class="shrink" style="display:flex; gap:10px; align-items:center;">
+            <div class="seg" id="song-tag" role="group" aria-label="Como você se sente cantando">
+              <button data-tag="comfortable">Confortável</button>
+              <button data-tag="neutral">Não sei</button>
+              <button data-tag="hard">Difícil</button>
+            </div>
+            <button class="ghost danger" id="song-delete">Excluir</button>
+          </div>
         </div>
       </div>
 
-      <div class="stat-row" id="song-stats"></div>
+      <!-- O herói é a conclusão, dita em tipo grande. -->
+      <div class="verdict" id="song-verdict"></div>
 
-      <div id="song-verdict"></div>
+      <div class="readouts" id="song-stats"></div>
 
-      <div class="card">
-        <div class="card-head">
-          <h2>Mapa de notas</h2>
-          <p class="sub">Cada bloco é uma nota cantada. A linha fina acompanha a afinação real — é onde se vê vibrato e portamento.</p>
-        </div>
-
+      <div class="register plain" style="padding-top:26px;">
         <div class="roll-wrap">
           <div class="roll-toolbar">
             <div class="legend" id="roll-legend"></div>
@@ -104,7 +110,7 @@
             <div class="slider-field">
               <label for="transpose">Transpor</label>
               <input type="range" id="transpose" min="-12" max="12" step="1" value="0">
-              <span class="readout" id="transpose-out">0 st</span>
+              <span class="readout-inline" id="transpose-out">0 st</span>
             </div>
             <button class="ghost" id="transpose-best">Melhor tom</button>
             <button class="ghost" id="play-btn">▶ Tocar</button>
@@ -114,147 +120,156 @@
             </div>
           </div>
           <div class="roll-and-hist">
-            <canvas id="roll" height="440"></canvas>
-            <div style="border-left:1px solid var(--border);">
-              <svg class="chart" id="hist-chart" height="440"></svg>
-            </div>
+            <canvas id="roll" height="460"></canvas>
+            <div><svg class="chart" id="hist-chart" height="460"></svg></div>
+          </div>
+          <div class="roll-hint">
+            Clique para ouvir a partir dali · <kbd>scroll</kbd> aproxima ·
+            <kbd>shift</kbd> + arrastar percorre
           </div>
         </div>
         <audio id="player" preload="none"></audio>
       </div>
 
       <div class="two-col">
-        <div class="card">
-          <div class="card-head">
-            <h2>Como a música sobe</h2>
-            <p class="sub">Altura ao longo do tempo, em janelas de 8 segundos</p>
+        <div class="register">
+          <div class="eyebrow">Como sobe<span class="hint">Altura ao longo do tempo, em janelas de 8 s.</span></div>
+          <div class="register-body">
+            <div class="legend" id="profile-legend" style="margin-bottom:14px;"></div>
+            <svg class="chart" id="profile-chart"></svg>
           </div>
-          <div class="legend" id="profile-legend"></div>
-          <svg class="chart" id="profile-chart"></svg>
         </div>
-        <div class="card">
-          <div class="card-head">
-            <h2>Melhor tom para você</h2>
-            <p class="sub">Quanto do tempo cantado cai dentro do seu alcance confortável, por transposição</p>
-          </div>
-          <svg class="chart" id="transpose-chart"></svg>
+        <div class="register">
+          <div class="eyebrow">Melhor tom<span class="hint">Quanto do tempo cantado cai no seu confortável, por transposição. Clique numa barra para experimentar.</span></div>
+          <div class="register-body"><svg class="chart" id="transpose-chart"></svg></div>
         </div>
       </div>
 
-      <div class="card">
-        <div class="card-head">
-          <h2>Momentos mais exigentes</h2>
-          <p class="sub">As notas mais agudas que ficam sustentadas — é o que de fato cansa. Clique para ouvir o trecho.</p>
+      <div class="register">
+        <div class="eyebrow">
+          Momentos exigentes
+          <span class="hint">Agudos sustentados — é o que de fato cansa. Ouça para conferir se é o cantor principal ou o coro.</span>
         </div>
-        <div class="scroll-x"><table class="data" id="demanding-table"></table></div>
+        <div class="register-body scroll-x"><table class="data" id="demanding-table"></table></div>
       </div>
     </div>
   </section>
 
-  <!-- ============ NOVA ANÁLISE ============ -->
+  <!-- ═══════════════ ANALISAR ═══════════════ -->
   <section class="view" id="view-new">
-    <h1>Nova análise</h1>
-    <p class="page-sub">Tudo roda na sua máquina: o download, a separação do vocal e a detecção de notas. Nada é enviado para fora.</p>
-
-    <div class="card">
-      <div class="card-head"><h2>De onde vem o áudio</h2></div>
-      <div class="seg" id="source-mode" role="group" aria-label="Origem" style="margin-bottom:16px;">
-        <button data-mode="youtube" aria-pressed="true">YouTube</button>
-        <button data-mode="upload">Arquivo do computador</button>
-      </div>
-
-      <label class="field" id="field-url">
-        <span>Link do vídeo — ou só o nome da música, que eu procuro</span>
-        <input type="text" id="in-url" placeholder="https://youtube.com/watch?v=…  ou  Sixteen Tons Tennessee Ernie Ford">
-      </label>
-
-      <label class="field" id="field-file" hidden>
-        <span>Arquivo de áudio (MP3, WAV, M4A…)</span>
-        <input type="file" id="in-file" accept="audio/*">
-      </label>
-
-      <div class="row">
-        <label class="field">
-          <span>Título (opcional — o YouTube preenche sozinho)</span>
-          <input type="text" id="in-title" placeholder="Nome da música">
-        </label>
-        <label class="field">
-          <span>Artista (opcional)</span>
-          <input type="text" id="in-artist" placeholder="Intérprete">
-        </label>
-      </div>
-
-      <div class="row" style="margin-bottom:16px;">
-        <div class="shrink">
-          <span style="display:block; font-size:12.5px; color:var(--text-secondary); margin-bottom:5px; font-weight:520;">Como você se sente cantando</span>
-          <div class="seg" id="in-tag" role="group" aria-label="Classificação inicial">
-            <button data-tag="comfortable">Confortável</button>
-            <button data-tag="neutral" aria-pressed="true">Não sei ainda</button>
-            <button data-tag="hard">Difícil</button>
-          </div>
-        </div>
-        <div class="shrink">
-          <span style="display:block; font-size:12.5px; color:var(--text-secondary); margin-bottom:5px; font-weight:520;">Isolar o vocal</span>
-          <div class="seg" id="in-separate" role="group" aria-label="Separação de stems">
-            <button data-sep="1" aria-pressed="true">Sim (Demucs)</button>
-            <button data-sep="0">Não, usar a mixagem</button>
-          </div>
-        </div>
-      </div>
-
-      <p class="sub" style="margin:0 0 16px; color:var(--text-muted);" id="demucs-note"></p>
-
-      <button class="primary" id="btn-analyze">Analisar</button>
+    <div class="page-head">
+      <h1>Analisar uma música</h1>
+      <p class="page-sub">O download, o isolamento do vocal e a detecção das notas rodam na sua máquina. Só a busca do áudio sai para a rede.</p>
     </div>
 
-    <div id="jobs"></div>
+    <div class="register">
+      <div class="eyebrow">Origem</div>
+      <div class="register-body">
+        <div class="seg" id="source-mode" role="group" aria-label="Origem do áudio" style="margin-bottom:20px;">
+          <button data-mode="youtube" aria-pressed="true">YouTube</button>
+          <button data-mode="upload">Arquivo</button>
+        </div>
+
+        <label class="field" id="field-url">
+          <span>Link — ou o nome da música, que eu procuro</span>
+          <input type="text" id="in-url" placeholder="Sixteen Tons Tennessee Ernie Ford">
+        </label>
+
+        <label class="field" id="field-file" hidden>
+          <span>Arquivo de áudio</span>
+          <input type="file" id="in-file" accept="audio/*">
+        </label>
+
+        <div class="row">
+          <label class="field">
+            <span>Título — opcional</span>
+            <input type="text" id="in-title" placeholder="o YouTube preenche sozinho">
+          </label>
+          <label class="field">
+            <span>Artista — opcional</span>
+            <input type="text" id="in-artist" placeholder="intérprete">
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="register">
+      <div class="eyebrow">Ajustes</div>
+      <div class="register-body">
+        <div class="row" style="margin-bottom:26px;">
+          <div class="shrink">
+            <span class="field-label">Como você se sente cantando</span>
+            <div class="seg" id="in-tag" role="group" aria-label="Classificação inicial">
+              <button data-tag="comfortable">Confortável</button>
+              <button data-tag="neutral" aria-pressed="true">Não sei</button>
+              <button data-tag="hard">Difícil</button>
+            </div>
+          </div>
+          <div class="shrink">
+            <span class="field-label">Isolar o vocal</span>
+            <div class="seg" id="in-separate" role="group" aria-label="Separação de stems">
+              <button data-sep="1" aria-pressed="true">Sim</button>
+              <button data-sep="0">Usar a mixagem</button>
+            </div>
+          </div>
+        </div>
+
+        <p class="sub" style="margin:0 0 26px; max-width:62ch;" id="demucs-note"></p>
+
+        <button class="primary" id="btn-analyze">Analisar</button>
+      </div>
+    </div>
+
+    <div class="register plain" id="jobs-wrap" hidden>
+      <div id="jobs"></div>
+    </div>
   </section>
 
-  <!-- ============ MEU ALCANCE ============ -->
+  <!-- ═══════════════ MINHA VOZ ═══════════════ -->
   <section class="view" id="view-range">
-    <h1>Meu alcance</h1>
-    <p class="page-sub">Esta é a régua contra a qual todas as músicas são medidas. Ajuste conforme você for se conhecendo.</p>
-
-    <div class="card">
-      <div class="card-head">
-        <h2>Faixas</h2>
-        <p class="sub">Confortável é onde você canta sem pensar. Extensão é até onde você chega forçando — com esforço, não sustentado.</p>
-      </div>
-
-      <div class="row" style="margin-bottom:20px;">
-        <label class="field">
-          <span>Confortável — nota mais grave</span>
-          <input type="text" id="set-comfort-low" placeholder="C3">
-        </label>
-        <label class="field">
-          <span>Confortável — nota mais aguda</span>
-          <input type="text" id="set-comfort-high" placeholder="E4">
-        </label>
-        <label class="field">
-          <span>Extensão — mínimo forçando</span>
-          <input type="text" id="set-stretch-low" placeholder="A2">
-        </label>
-        <label class="field">
-          <span>Extensão — máximo forçando</span>
-          <input type="text" id="set-stretch-high" placeholder="A4">
-        </label>
-      </div>
-
-      <div style="margin-bottom:20px;">
-        <div style="font-size:12.5px; color:var(--text-secondary); margin-bottom:8px; font-weight:520;">Prévia</div>
-        <svg class="chart" id="range-preview"></svg>
-      </div>
-
-      <button class="primary" id="btn-save-range">Salvar alcance</button>
-      <span id="range-saved" style="margin-left:12px; color:var(--text-muted); font-size:12.5px;"></span>
+    <div class="page-head">
+      <h1>Minha voz</h1>
+      <p class="page-sub">A régua contra a qual toda música é medida. Ajuste conforme for se conhecendo — nada aqui é definitivo.</p>
     </div>
 
-    <div class="card">
-      <div class="card-head">
-        <h2>Deduzir a partir da biblioteca</h2>
-        <p class="sub">Se você já classificou músicas como confortáveis, dá para estimar seu alcance a partir delas.</p>
+    <div class="register">
+      <div class="eyebrow">
+        Faixas
+        <span class="hint">Confortável é onde você canta sem pensar. Extensão é até onde chega forçando — com esforço, não sustentado.</span>
       </div>
-      <div id="range-suggestion"><div class="empty">Classifique ao menos uma música como confortável para ver uma sugestão.</div></div>
+      <div class="register-body">
+        <div class="row" style="margin-bottom:26px;">
+          <label class="field">
+            <span>Confortável — grave</span>
+            <input type="text" id="set-comfort-low" placeholder="C3">
+          </label>
+          <label class="field">
+            <span>Confortável — agudo</span>
+            <input type="text" id="set-comfort-high" placeholder="E4">
+          </label>
+          <label class="field">
+            <span>Extensão — grave</span>
+            <input type="text" id="set-stretch-low" placeholder="A2">
+          </label>
+          <label class="field">
+            <span>Extensão — agudo</span>
+            <input type="text" id="set-stretch-high" placeholder="A4">
+          </label>
+        </div>
+
+        <svg class="chart" id="range-preview" style="margin-bottom:26px;"></svg>
+
+        <button class="primary" id="btn-save-range">Salvar</button>
+        <span class="saved-msg" id="range-saved"></span>
+      </div>
+    </div>
+
+    <div class="register">
+      <div class="eyebrow">
+        Deduzir da biblioteca
+        <span class="hint">Se você já marcou músicas como confortáveis, dá para estimar seu alcance a partir delas.</span>
+      </div>
+      <div class="register-body" id="range-suggestion"></div>
     </div>
   </section>
 

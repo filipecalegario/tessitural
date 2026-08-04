@@ -59,24 +59,56 @@ Se mudar a forma do `analysis.json`, reanalise a biblioteca inteira — não há
 - **`compute_stats` pondera por duração**, não por contagem de notas. Percentil de altura
   aqui significa "onde a voz passa X% do *tempo*", que é o que importa para esforço vocal.
 
-## Convenções de visualização
+## Design da interface
 
-A camada visual segue a skill `dataviz` e as escolhas já foram validadas — não as reverta
-por gosto pessoal.
+Direção: **painel de instrumento** — a faceplate de um aparelho de áudio, cruzada com a
+disciplina redutiva do design modernista brasileiro de discos (Elenco). Escuro por padrão,
+grid rigoroso, tipografia geométrica, um acento quente. As escolhas abaixo foram medidas ou
+deliberadas; não as reverta por gosto.
 
-- **Paleta:** azul = a voz / contexto normal; vermelho = o que estoura o alcance; cinza =
-  sem classificação. O par azul↔vermelho passa os testes de daltonismo (ΔE 23,8 protanopia).
-  **Não use verde × vermelho** para "confortável × difícil": ΔE 4,1 em deuteranopia, falha.
+**A regra de cor que organiza tudo — três papéis, sem sobreposição:**
+
+| Papel | Como se manifesta | Nunca |
+|---|---|---|
+| A **sua voz** | superfície iluminada (`--lit` / `--lit-soft`): o chão da medida | vira cor |
+| A **música** | tinta: `--voice` azul (ao alcance), `--strain` coral (estoura) | vira fundo |
+| **Identidade** | `--lamp` âmbar: marca, aba ativa, foco, botão primário | encosta em dado |
+
+Âmbar como cor de dado **foi testado e reprovado**: ΔE 14,0 contra o coral — indistinguível
+até com visão normal. O par azul↔coral passa tudo (ΔE 22,9 protanopia) nos dois temas.
+Verde × vermelho para "confortável × difícil" também falha (ΔE 4,1 deuteranopia).
+
 - **A cor nunca carrega significado sozinha.** No piano roll a posição vertical contra a
-  faixa sombreada já codifica o conforto; a cor reforça. Todo gráfico com 2+ séries tem
-  legenda, e os principais têm visão em tabela.
-- **Tema claro e escuro** são ambos escolhidos passo a passo em `style.css` (via
-  `prefers-color-scheme` **e** `[data-theme]`), não uma inversão automática. Ao adicionar
-  cor, defina nos dois blocos.
-- Gráficos leem cores com `cssVar()` em tempo de desenho — por isso trocar de tema
-  redesenha tudo em vez de recarregar.
-- Marcas finas, grade recessiva, rótulo direto só nos extremos (nunca um número em cada
-  ponto).
+  faixa acesa já codifica o conforto; a cor reforça. Gráficos com 2+ séries têm legenda, e
+  os principais têm visão em tabela.
+- **Ênfase em vez de categórico** onde uma série é o assunto: o perfil temporal usa azul
+  para a mediana e cinza para o teto, não duas cores concorrentes.
+- **Escuro é o padrão do produto**, não a preferência do sistema — não há
+  `prefers-color-scheme`. O claro existe em `:root[data-theme="light"]`; ao adicionar um
+  token, defina nos dois blocos.
+- Gráficos leem cores com `cssVar()` na hora de desenhar, por isso trocar de tema redesenha
+  tudo em vez de recarregar.
+
+**Tipografia** (fontes locais do macOS, sem download): `--display` Futura para títulos,
+números grandes e o veredito; `--font` Avenir Next para corpo e interface; `--mono` Menlo
+para tudo que é leitura de aparelho — nomes de nota, tempos, eixos, células de tabela.
+Futura só a partir de ~17px: em corpo pequeno ela perde legibilidade.
+
+**Estrutura:** nada de cards flutuantes. A página é uma pilha de `.register` — faixas
+horizontais de largura total separadas por fio de cabelo, o mesmo desenho das linhas de um
+piano roll. Dentro de cada uma, grid de duas colunas: `.eyebrow` maiúsculo à esquerda,
+conteúdo à direita. Raio zero na moldura; as marcas de dado é que são arredondadas.
+
+**A assinatura** é a régua de registro (`Charts.registerRail`) no cabeçalho: sua voz sempre
+à vista, com a música aberta sobreposta. É o argumento do app virado mobília — se for mexer
+nela, é isso que está em jogo.
+
+**Movimento:** existe um único momento — as notas entram no sentido do tempo ao abrir uma
+música (`PianoRoll.startReveal`). Respeita `prefers-reduced-motion`. Não acrescente outros.
+
+**Armadilha de CSS:** `[hidden] { display: none !important }` está no topo da folha de
+propósito. Sem isso, qualquer `display` vindo de classe (`.register.plain`) vence o atributo
+`hidden` e o elemento aparece quando não deveria — já aconteceu.
 
 ## Notas de implementação
 
